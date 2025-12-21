@@ -1,0 +1,22 @@
+name: Daily Nasdaq Report
+on:
+  schedule:
+    - cron: '0 22 * * *' # 한국 시간 오전 7시 (미장 마감 직후)
+  workflow_dispatch:      # 수동 실행 버튼 추가
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      - name: Install dependencies
+        run: pip install yfinance python-telegram-bot
+      - name: Run script
+        run: python main.py
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
