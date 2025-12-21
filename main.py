@@ -4,8 +4,8 @@ import asyncio
 import os
 
 # 1. 설정 (환경변수 또는 직접 입력)
-TELEGRAM_TOKEN = os.environ['8257691024:AAHCpoI_jCpkNr77twO8SFjOu6m7kjSAYzI']
-CHAT_ID = os.environ['8388989625']
+TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
+CHAT_ID = os.environ.get('CHAT_ID')
 
 async def send_nasdaq_report():
     # 1. API로부터 나스닥 100 지수 데이터 수신
