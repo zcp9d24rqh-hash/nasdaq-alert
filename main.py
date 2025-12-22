@@ -1,22 +1,20 @@
-Python
 import yfinance as yf
 import telegram
 import asyncio
 import os
 
+# GitHub Secrets에서 정보를 안전하게 가져오는 설정입니다.
+# 직접 토큰 번호를 입력하지 마세요!
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
 CHAT_ID = os.environ.get('CHAT_ID')
 
 async def get_data(ticker_symbol):
-    """데이터 수집 기간을 10일로 늘려 휴장기 영향을 최소화합니다."""
+    """최근 10일 데이터를 가져와서 분석합니다."""
     try:
         ticker = yf.Ticker(ticker_symbol)
-        # 휴장일이 긴 연말연시를 대비해 10일치 데이터를 가져옵니다.
         hist = ticker.history(period="10d")
         
-        # 데이터가 아예 없거나 부족할 경우 예외 처리
         if hist.empty or len(hist) < 2:
-            print(f"⚠️ {ticker_symbol}: 충분한 데이터를 찾을 수 없습니다.")
             return None
             
         curr = hist['Close'].iloc[-1]
@@ -25,13 +23,12 @@ async def get_data(ticker_symbol):
         percent = (diff / prev) * 100
         return {"curr": curr, "diff": diff, "percent": percent}
     except Exception as e:
-        print(f"❌ {ticker_symbol} 데이터 호출 중 에러 발생: {e}")
+        print(f"Error fetching {ticker_symbol}: {e}")
         return None
 
 def format_row(name, data, is_rate=False):
     if not data:
-        # 오류 발생 시 사용자에게 알림
-        return f"⚠️ {name}: 데이터 불러오기 실패\n"
+        return f"⚠️ {name}: 데이터 오류\n"
     
     emoji = "🔴" if data['diff'] > 0 else "🔵" if data['diff'] < 0 else "⚪"
     mark = "▲" if data['diff'] > 0 else "▼" if data['diff'] < 0 else "-"
@@ -40,7 +37,7 @@ def format_row(name, data, is_rate=False):
     return f"{emoji} {name}: {data['curr']:,.2f}{unit} ({mark}{abs(data['percent']):.2f}%)\n"
 
 async def send_all_in_one_report():
-    # 가장 표준적이고 안정적인 티커로 재구성
+    # 티커 설정
     indices = {"나스닥 100": "^NDX", "S&P 500": "^GSPC"}
     currencies = {"달러/원": "USDKRW=X", "엔/달러": "JPY=X", "달러인덱스": "DX-Y.NYB"}
     rates = {"미 국채 10년물": "^TNX", "VIX 공포지수": "^VIX"}
@@ -50,24 +47,33 @@ async def send_all_in_one_report():
 
     msg = "<b>🇺🇸 [데일리 매크로 리포트]</b>\n\n"
     
-    # 헬퍼 함수로 섹션 반복 처리
-    sections = [
-        ("주요 지수", indices),
-        ("환율 현황", currencies),
-        ("금리 및 암호화폐", rates, crypto),
-        ("원자재 및 물가", commodities, inflation)
-    ]
+    # 지수
+    msg += "<b>[주요 지수]</b>\n"
+    for name, ticker in indices.items():
+        msg += format_row(name, await get_data(ticker))
+        
+    # 환율
+    msg += "\n<b>[환율 현황]</b>\n"
+    for name, ticker in currencies.items():
+        msg += format_row(name, await get_data(ticker))
 
-    for section in sections:
-        msg += f"<b>[{section[0]}]</b>\n"
-        for i in range(1, len(section)):
-            for name, ticker in section[i].items():
-                is_rate = name in ["미 국채 10년물", "VIX 공포지수", "기대 인플레이션"]
-                msg += format_row(name, await get_data(ticker), is_rate)
-        msg += "\n"
+    # 금리 및 암호화폐
+    msg += "\n<b>[금리 및 암호화폐]</b>\n"
+    for name, ticker in rates.items():
+        msg += format_row(name, await get_data(ticker), is_rate=True)
+    for name, ticker in crypto.items():
+        msg += format_row(name, await get_data(ticker))
 
-    msg += "<b>[참고: 최근 CPI 발표치]</b>\n📌 헤드라인 CPI: <b>2.6%</b>\n"
+    # 원자재 및 물가
+    msg += "\n<b>[원자재 및 물가]</b>\n"
+    for name, ticker in commodities.items():
+        msg += format_row(name, await get_data(ticker))
+    for name, ticker in inflation.items():
+        msg += format_row(name, await get_data(ticker), is_rate=True)
 
+    msg += "\n<b>[참고: 최근 CPI 발표치]</b>\n📌 헤드라인 CPI: <b>2.6%</b>\n"
+
+    # 전송
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     await bot.send_message(chat_id=CHAT_ID, text=msg, parse_mode='HTML')
 
