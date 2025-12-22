@@ -36,14 +36,13 @@ def format_row(name, data, is_rate=False):
     return f"{emoji} {name}: {data['curr']:,.2f}{unit} ({mark}{abs(data['percent']):.2f}%)\n"
 
 async def send_all_in_one_report():
-    # 티커 설정: 코스닥(^KQ11) 추가
+    # 티커 설정: 코스닥 제거, 코스피(^KS11) 추가
     indices = {
         "나스닥 100": "^NDX", 
         "S&P 500": "^GSPC",
-        "코스닥": "^KQ11"
+        "코스피": "^KS11"
     }
     
-    # 환율: 엔/원(JPYKRW=X), 유로/원(EURKRW=X) 포함
     currencies = {
         "달러/원": "USDKRW=X", 
         "엔/원": "JPYKRW=X", 
@@ -68,7 +67,7 @@ async def send_all_in_one_report():
         msg += format_row(name, await get_data(ticker))
 
     # 금리 및 암호화폐 섹션
-    msg += "\n<b>[금리 및 암호화폐]</b>\n"
+    msg += "\n<b>[채권 금리 및 암호화폐]</b>\n"
     for name, ticker in rates.items():
         msg += format_row(name, await get_data(ticker), is_rate=True)
     for name, ticker in crypto.items():
@@ -79,7 +78,11 @@ async def send_all_in_one_report():
     for name, ticker in commodities.items():
         msg += format_row(name, await get_data(ticker))
 
-    msg += "\n<b>[참고: 최근 CPI 발표치]</b>\n📌 헤드라인 CPI: <b>2.6%</b>\n"
+    # 참고 항목: 기준금리 및 CPI 추가
+    msg += "\n<b>[참고: 주요 경제 지표]</b>\n"
+    msg += "🏦 미국 기준금리: <b>4.50 ~ 4.75%</b>\n"
+    msg += "🏦 한국 기준금리: <b>3.00%</b>\n"
+    msg += "📌 헤드라인 CPI: <b>2.6%</b>\n"
 
     # 전송
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
