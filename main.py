@@ -4,7 +4,6 @@ import asyncio
 import os
 
 # GitHub Secrets에서 정보를 안전하게 가져오는 설정입니다.
-# 직접 토큰 번호를 입력하지 마세요!
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
 CHAT_ID = os.environ.get('CHAT_ID')
 
@@ -37,13 +36,20 @@ def format_row(name, data, is_rate=False):
     return f"{emoji} {name}: {data['curr']:,.2f}{unit} ({mark}{abs(data['percent']):.2f}%)\n"
 
 async def send_all_in_one_report():
-    # 티커 설정
+    # 티커 설정 수정
     indices = {"나스닥 100": "^NDX", "S&P 500": "^GSPC"}
-    currencies = {"달러/원": "USDKRW=X", "엔/달러": "JPY=X", "달러인덱스": "DX-Y.NYB"}
+    
+    # 환율: 엔/달러 삭제, 엔/원 및 유로/원 추가
+    currencies = {
+        "달러/원": "USDKRW=X", 
+        "엔/원": "JPYKRW=X", 
+        "유로/원": "EURKRW=X", 
+        "달러인덱스": "DX-Y.NYB"
+    }
+    
     rates = {"미 국채 10년물": "^TNX", "VIX 공포지수": "^VIX"}
     commodities = {"WTI 유가": "CL=F", "금(Gold)": "GC=F"}
     crypto = {"비트코인": "BTC-USD"}
-    inflation = {"기대 인플레이션": "^T10YIE"}
 
     msg = "<b>🇺🇸 [데일리 매크로 리포트]</b>\n\n"
     
@@ -64,12 +70,10 @@ async def send_all_in_one_report():
     for name, ticker in crypto.items():
         msg += format_row(name, await get_data(ticker))
 
-    # 원자재 및 물가
-    msg += "\n<b>[원자재 및 물가]</b>\n"
+    # 원자재 (기대 인플레이션 항목 삭제)
+    msg += "\n<b>[원자재 현황]</b>\n"
     for name, ticker in commodities.items():
         msg += format_row(name, await get_data(ticker))
-    for name, ticker in inflation.items():
-        msg += format_row(name, await get_data(ticker), is_rate=True)
 
     msg += "\n<b>[참고: 최근 CPI 발표치]</b>\n📌 헤드라인 CPI: <b>2.6%</b>\n"
 
