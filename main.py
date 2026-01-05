@@ -8,10 +8,11 @@ TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
 CHAT_ID = os.environ.get('CHAT_ID')
 
 async def get_data(ticker_symbol):
-    """최근 10일 데이터를 가져와서 분석합니다."""
+    """최근 데이터를 가져와서 분석합니다."""
     try:
         ticker = yf.Ticker(ticker_symbol)
-        hist = ticker.history(period="10d")
+        # 휴장일을 고려해 7일치 데이터를 가져옵니다.
+        hist = ticker.history(period="7d")
         
         if hist.empty or len(hist) < 2:
             return None
@@ -36,16 +37,15 @@ def format_row(name, data, is_rate=False):
     return f"{emoji} {name}: {data['curr']:,.2f}{unit} ({mark}{abs(data['percent']):.2f}%)\n"
 
 async def send_all_in_one_report():
+    # '나스닥 100(^NDX)'을 '나스닥 종합지수(^IXIC)'로 변경했습니다.
     indices = {
-        "나스닥 100": "^NDX", 
+        "나스닥 종합": "^IXIC", 
         "S&P 500": "^GSPC",
         "코스피": "^KS11"
     }
     
     currencies = {
         "달러/원": "USDKRW=X", 
-        "엔/원": "JPYKRW=X", 
-        "유로/원": "EURKRW=X", 
         "달러인덱스": "DX-Y.NYB"
     }
     
@@ -55,33 +55,26 @@ async def send_all_in_one_report():
 
     msg = "<b>📊 [데일리 매크로 리포트]</b>\n\n"
     
-    # [주요 지수] 섹션 (에러가 발생했던 부분)
-    msg += "<b>[주요 지수]</b>\n"
-    for name, ticker in indices.items():  # .items()와 in이 반드시 있어야 합니다.
-        msg += format_row(name, await get_data(ticker))
-        
-    # [환율 현황] 섹션
-    msg += "\n<b>[환율 현황]</b>\n"
-    for name, ticker in currencies.items():
-        msg += format_row(name, await get_data(ticker))
+    # 각 섹션별 데이터 처리
+    sections = [
+        ("주요 지수", indices, False),
+        ("환율 현황", currencies, False),
+        ("채권 및 암호화폐", {**rates, **crypto}, True), # 금리/비트코인 혼합
+        ("원자재 현황", commodities, False)
+    ]
 
-    # [채권 및 암호화폐] 섹션
-    msg += "\n<b>[채권 및 암호화폐]</b>\n"
-    for name, ticker in rates.items():
-        msg += format_row(name, await get_data(ticker), is_rate=True)
-    for name, ticker in crypto.items():
-        msg += format_row(name, await get_data(ticker))
+    for section_name, items, is_rate in sections:
+        msg += f"<b>[{section_name}]</b>\n"
+        for name, ticker in items.items():
+            # 비트코인이나 지수는 퍼센트 단위가 아니므로 개별 처리 가능하지만 
+            # 편의상 기존 format_row 로직을 유지합니다.
+            msg += format_row(name, await get_data(ticker), is_rate if "국채" in name else False)
+        msg += "\n"
 
-    # [원자재 현황] 섹션
-    msg += "\n<b>[원자재 현황]</b>\n"
-    for name, ticker in commodities.items():
-        msg += format_row(name, await get_data(ticker))
-
-    # [참고: 주요 경제 지표] 섹션
-    msg += "\n<b>[참고: 주요 경제 지표]</b>\n"
-    msg += "🏦 미국 기준금리: <b>3.50 ~ 3.75%</b>\n"
-    msg += "🏦 한국 기준금리: <b>2.50%</b>\n"
-    msg += "📌 미국 CPI(최근): <b>2.7%</b>\n"
+    # 참고 지표 (필요시 수동 업데이트)
+    msg += "<b>[참고: 주요 경제 지표]</b>\n"
+    msg += "🏦 미국 기준금리: <b>4.50 ~ 4.75%</b>\n"
+    msg += "🏦 한국 기준금리: <b>3.00%</b>\n"
 
     # 전송
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
