@@ -49,7 +49,7 @@ async def send_all_in_one_report():
         "달러/원": "USDKRW=X", 
         "엔/원": "JPYKRW=X",
         "유로/원": "EURKRW=X",
-        "달러인덱스": "DX-Y.NYB"
+        "달러인덱스": "DX=F"
     }
     
     # 3. 채권, 암호화폐, 원자재
