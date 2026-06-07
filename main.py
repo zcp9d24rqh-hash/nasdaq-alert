@@ -3,17 +3,24 @@ import telegram
 import asyncio
 import os
 import pandas as pd
+from datetime import datetime, timedelta
 
 # GitHub Secrets 설정
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
 CHAT_ID = os.environ.get('CHAT_ID')
 
 async def get_data(ticker_symbol):
-    """최근 데이터를 가져와서 분석합니다."""
+    """최근 데이터를 가져와서 분석합니다. 시차로 인한 누락을 막기 위해 날짜를 명시합니다."""
     try:
         ticker = yf.Ticker(ticker_symbol)
-        # 휴장일을 고려해 넉넉히 10일치 데이터를 가져옵니다.
-        hist = ticker.history(period="10d")
+        
+        # 오늘과 15일 전 날짜 계산 (end를 내일로 잡아야 오늘 마감 데이터가 안전하게 들어옵니다)
+        today = datetime.now()
+        start_date = (today - timedelta(days=15)).strftime('%Y-%m-%d')
+        end_date = (today + timedelta(days=1)).strftime('%Y-%m-%d')
+        
+        # period 대신 start와 end를 지정하여 데이터 수집
+        hist = ticker.history(start=start_date, end=end_date)
         
         # NaN 값 제거 및 데이터 존재 확인
         hist = hist.dropna(subset=['Close'])
@@ -53,7 +60,7 @@ async def send_all_in_one_report():
         "코스피": "^KS11"
     }
     
-    # 2. 환율 현황 (달러인덱스 티커 수정: DX-Y.NYB)
+    # 2. 환율 현황
     currencies = {
         "달러/원": "USDKRW=X", 
         "엔/원": "JPYKRW=X",
